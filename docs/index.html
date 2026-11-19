@@ -634,9 +634,9 @@ client_assertion_type=urn:ietf:...:jwt-bearer
     <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Why not a bearer token">
+  <section class="slide" aria-label="Why not an access token">
     <p class="eyebrow">02 · Design choice</p>
-    <h2 class="headline">Why rotation doesn't take a bearer token</h2>
+    <h2 class="headline">Why rotation doesn't take an access token</h2>
     <div style="display: grid; grid-template-columns: 610px 1fr; height: 300px">
       <div class="panel snow-panel" style="border-radius: 12px 0 0 12px">
         <p class="eyebrow" style="font-size: 20px; color: var(--ink-muted)">Rejected</p>
@@ -649,7 +649,7 @@ client_assertion_type=urn:ietf:...:jwt-bearer
         <p class="small">Each change proves possession of a registered private key, in a single-use JWT addressed to this endpoint alone.</p>
       </div>
     </div>
-    <p style="margin-top: 80px"><span class="eyebrow" style="font-size: 20px; margin-right: 18px">Also note ·</span>Client credentials only authenticate on the <code>/oauth</code> endpoints: token, revoke and jwks. Everything under <code>/v1</code> takes tokens.</p>
+    <p style="margin-top: 80px"><span class="eyebrow" style="font-size: 20px; margin-right: 18px">Also note ·</span>A signed assertion or client secret only authenticates on the <code>/oauth</code> endpoints: token, revoke and jwks. Everything under <code>/v1</code> takes an API key or an OAuth access token.</p>
     <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
