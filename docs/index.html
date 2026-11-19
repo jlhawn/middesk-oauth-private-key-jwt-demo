@@ -375,9 +375,10 @@ grant_type=client_credentials
       <h2>Use the token like any bearer credential</h2>
       <div class="grid two">
 <pre><span class="k">await</span> middesk.createBusiness(token.access_token, {
-  name: <span class="s">'Key Rotation Demo'</span>,
+  name: <span class="s">'Middesk Inc'</span>,
   addresses: [{
-    address_line1: <span class="s">'577 Howard St'</span>,
+    address_line1: <span class="s">'85 Second Street'</span>,
+    address_line2: <span class="s">'Suite 710'</span>,
     city: <span class="s">'San Francisco'</span>,
     state: <span class="s">'CA'</span>,
     postal_code: <span class="s">'94105'</span>,

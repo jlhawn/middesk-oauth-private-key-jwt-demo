@@ -80,10 +80,11 @@ async function main() {
 
     heading('Create a business with the access token');
     const business = await middesk.createBusiness(token1.access_token, {
-      name: `Key Rotation Demo ${new Date().toISOString()}`,
+      name: 'Middesk Inc',
       addresses: [
         {
-          address_line1: '577 Howard St',
+          address_line1: '85 Second Street',
+          address_line2: 'Suite 710',
           city: 'San Francisco',
           state: 'CA',
           postal_code: '94105',
