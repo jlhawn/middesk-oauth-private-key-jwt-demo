@@ -5,289 +5,385 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Private Key JWT Rotation</title>
 <meta name="description" content="Middesk OAuth client_credentials with private_key_jwt, 10-minute tokens and self-service RSA key rotation, walked through with a Node.js client.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Inter:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f6f2;
-    --surface: #ffffff;
-    --ink: #1c1d21;
-    --muted: #5d6170;
-    --line: #dcdad2;
-    --accent: #3a5bd9;
-    --accent-soft: #e6ebfb;
-    --ok: #1f7a4d;
-    --ok-soft: #e1f2e9;
-    --bad: #b3261e;
-    --bad-soft: #fbe5e3;
-    --code-bg: #f0eee8;
-    --code-ink: #24262d;
-    --tok-key: #7a3fb3;
-    --tok-str: #1f7a4d;
-    --tok-com: #7b7f8c;
-    --tok-num: #b35c00;
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #15161a;
-      --surface: #1d1f24;
-      --ink: #ecebe6;
-      --muted: #a2a5b0;
-      --line: #33363e;
-      --accent: #8fa6ff;
-      --accent-soft: #252c47;
-      --ok: #6fd3a0;
-      --ok-soft: #1c3329;
-      --bad: #ff8a80;
-      --bad-soft: #3b2220;
-      --code-bg: #111216;
-      --code-ink: #e3e2dc;
-      --tok-key: #c9a4ff;
-      --tok-str: #8be0b0;
-      --tok-com: #7f8392;
-      --tok-num: #ffb86b;
-    }
-  }
-  :root[data-theme="dark"] {
-    --bg: #15161a;
-    --surface: #1d1f24;
-    --ink: #ecebe6;
-    --muted: #a2a5b0;
-    --line: #33363e;
-    --accent: #8fa6ff;
-    --accent-soft: #252c47;
-    --ok: #6fd3a0;
-    --ok-soft: #1c3329;
-    --bad: #ff8a80;
-    --bad-soft: #3b2220;
-    --code-bg: #111216;
-    --code-ink: #e3e2dc;
-    --tok-key: #c9a4ff;
-    --tok-str: #8be0b0;
-    --tok-com: #7f8392;
-    --tok-num: #ffb86b;
+    --midnight: #0B3139;
+    --lime: #A8FF1C;
+    --snow: #F0F0F0;
+    --fog: #DCE6E9;
+    --slate: #A0C1CB;
+    --white: #FFFFFF;
+    --teal: #236B7E;
+    --ink-soft: #3E5C63;
+    --ink-muted: #557780;
+    --error: #C62828;
+    --error-soft: #FCE4E4;
+    --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "DM Mono", ui-monospace, "SF Mono", Menlo, monospace;
   }
 
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font: 18px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-    overflow: hidden;
-  }
-  code, pre, .mono { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+  html, body { height: 100%; margin: 0; overflow: hidden; }
+  body { background: #06232A; font-family: var(--sans); color: var(--midnight); }
 
-  .deck { position: relative; height: 100%; }
+  .viewport { position: fixed; inset: 0; overflow: hidden; }
+  .stage {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 1920px;
+    height: 1080px;
+    transform-origin: center;
+    transform: translate(-50%, -50%) scale(var(--scale, .5));
+  }
+
   .slide {
     position: absolute;
     inset: 0;
     display: none;
-    overflow-y: auto;
-    padding: clamp(24px, 5vh, 64px) clamp(16px, 6vw, 96px) 96px;
+    overflow: hidden;
+    padding: 112px 120px 0;
+    background: var(--white);
+    font-size: 26px;
+    line-height: 1.45;
   }
-  .slide.active { display: block; animation: enter .25s ease-out; }
-  @keyframes enter { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-  @media (prefers-reduced-motion: reduce) { .slide.active { animation: none; } }
-  .inner { max-width: 1080px; margin: 0 auto; }
+  .slide.active { display: block; }
+  .slide.snow { background: var(--snow); }
 
   .eyebrow {
-    color: var(--accent);
-    font-size: .8rem;
-    font-weight: 600;
+    font-family: var(--mono);
+    font-size: 22px;
     letter-spacing: .08em;
     text-transform: uppercase;
-    margin: 0 0 .5rem;
+    margin: 0 0 22px;
   }
-  h1 { font-size: clamp(2rem, 5vw, 3.4rem); line-height: 1.1; margin: 0 0 1rem; letter-spacing: -.02em; }
-  h2 { font-size: clamp(1.5rem, 3.2vw, 2.3rem); line-height: 1.15; margin: 0 0 1.25rem; letter-spacing: -.01em; }
-  h3 { font-size: 1.05rem; margin: 0 0 .5rem; }
-  p { margin: 0 0 1rem; }
-  .lede { font-size: clamp(1.05rem, 2vw, 1.3rem); color: var(--muted); max-width: 46rem; }
-  .muted { color: var(--muted); }
-  ul { margin: 0 0 1rem; padding-left: 1.2rem; }
-  li { margin: .35rem 0; }
-  li::marker { color: var(--accent); }
+  .headline {
+    font-weight: 300;
+    font-size: 72px;
+    line-height: 1.1;
+    letter-spacing: -.02em;
+    margin: 0 0 64px;
+  }
+  .card-title { font-weight: 400; font-size: 40px; line-height: 1.2; margin: 0 0 14px; }
+  p { margin: 0 0 18px; }
+  .soft { color: var(--ink-soft); }
+  .small { font-size: 22px; }
 
-  .grid { display: grid; gap: 20px; }
-  .two { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-  .three { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
-
-  .card {
-    background: var(--surface);
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    padding: 18px 20px;
-  }
-  .card p:last-child, .card ul:last-child { margin-bottom: 0; }
-  .card.ok { border-color: var(--ok); background: var(--ok-soft); }
-  .card.bad { border-color: var(--bad); background: var(--bad-soft); }
-  .num {
-    display: inline-grid; place-items: center;
-    width: 1.7rem; height: 1.7rem; border-radius: 50%;
-    background: var(--accent-soft); color: var(--accent);
-    font-weight: 700; font-size: .85rem; margin-right: .5rem;
+  .footer {
+    position: absolute;
+    left: 120px;
+    right: 120px;
+    bottom: 0;
+    height: 98px;
+    border-top: 1px solid var(--fog);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-top: 30px;
+    font-family: var(--mono);
+    font-size: 19px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
   }
 
-  pre {
-    background: var(--code-bg);
-    color: var(--code-ink);
-    border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 16px 18px;
-    margin: 0 0 1rem;
-    font-size: clamp(.72rem, 1.35vw, .88rem);
-    line-height: 1.55;
-    overflow-x: auto;
+  .cols { display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 32px; }
+  .span-4 { grid-column: span 4; }
+  .span-5 { grid-column: span 5; }
+  .span-6 { grid-column: span 6; }
+  .span-7 { grid-column: span 7; }
+  .span-8 { grid-column: span 8; }
+
+  .chip {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 19px;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    background: var(--lime);
+    color: var(--midnight);
+    border-radius: 6px;
+    padding: 6px 14px;
   }
+  .pill {
+    display: inline-block;
+    border: 1.5px solid var(--midnight);
+    border-radius: 999px;
+    padding: 8px 22px;
+    font-size: 22px;
+    margin: 0 10px 10px 0;
+    white-space: nowrap;
+  }
+  .pill.mono { font-family: var(--mono); font-size: 19px; }
+  .pill.lime { background: var(--lime); }
+
+  ul.squares { list-style: none; margin: 0; padding: 0; }
+  ul.squares li { position: relative; padding-left: 40px; margin: 0 0 20px; }
+  ul.squares li::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: .5em;
+    width: 13px;
+    height: 13px;
+    background: var(--lime);
+    border: 1.5px solid var(--midnight);
+  }
+
+  code, pre { font-family: var(--mono); }
   :not(pre) > code {
-    background: var(--code-bg);
-    border: 1px solid var(--line);
-    border-radius: 5px;
-    padding: .05em .35em;
-    font-size: .88em;
+    font-size: .86em;
+    background: var(--fog);
+    border-radius: 6px;
+    padding: .06em .32em;
   }
-  .k { color: var(--tok-key); }
-  .s { color: var(--tok-str); }
-  .c { color: var(--tok-com); font-style: italic; }
-  .n { color: var(--tok-num); }
-  .ok-text { color: var(--ok); }
-  .bad-text { color: var(--bad); }
+  pre {
+    margin: 0;
+    background: var(--snow);
+    border: 1px solid var(--slate);
+    border-radius: 12px;
+    padding: 28px 32px;
+    font-size: 20px;
+    line-height: 1.6;
+    color: var(--midnight);
+    white-space: pre;
+    overflow: hidden;
+  }
+  .snow pre { background: var(--white); }
+  .k { font-weight: 500; }
+  .s, .n { color: var(--teal); }
+  .c { color: var(--ink-muted); }
 
-  table { border-collapse: collapse; width: 100%; font-size: .92rem; }
-  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
-  th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .05em; }
-  .table-wrap { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; background: var(--white); }
+  th {
+    background: var(--midnight);
+    color: var(--white);
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 19px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    text-align: left;
+    padding: 22px 28px;
+  }
+  td { font-size: 24px; padding: 20px 28px; border-bottom: 1px solid var(--slate); vertical-align: top; }
+  td.mono { font-family: var(--mono); font-size: 21px; }
 
-  svg.diagram { width: 100%; height: auto; display: block; }
-  svg.diagram text { font-family: ui-sans-serif, system-ui, sans-serif; fill: var(--ink); }
-  svg.diagram .box { fill: var(--surface); stroke: var(--line); stroke-width: 1.5; }
-  svg.diagram .box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
-  svg.diagram .box-ok { fill: var(--ok-soft); stroke: var(--ok); stroke-width: 1.5; }
-  svg.diagram .box-bad { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.5; }
-  svg.diagram .edge { stroke: var(--muted); stroke-width: 1.5; fill: none; }
-  svg.diagram .edge-accent { stroke: var(--accent); stroke-width: 2; fill: none; }
-  svg.diagram .label { fill: var(--muted); font-size: 13px; }
-  svg.diagram .title { font-weight: 600; font-size: 15px; }
-  svg.diagram .mono { font-family: ui-monospace, Menlo, monospace; font-size: 12.5px; }
-  svg.diagram .arrow { fill: var(--muted); }
-  svg.diagram .arrow-accent { fill: var(--accent); }
+  .rows { border-top: 1px solid var(--slate); }
+  .row { display: grid; align-items: center; border-bottom: 1px solid var(--slate); }
+  .row .idx { font-family: var(--mono); font-size: 24px; }
 
-  .chrome {
-    position: fixed; left: 0; right: 0; bottom: 0;
-    display: flex; align-items: center; gap: 12px;
-    padding: 10px clamp(16px, 4vw, 32px);
-    background: color-mix(in srgb, var(--bg) 88%, transparent);
-    backdrop-filter: blur(6px);
-    border-top: 1px solid var(--line);
-    font-size: .85rem;
-    color: var(--muted);
+  .panel { border-radius: 12px; padding: 44px 48px; }
+  .panel.fog { background: var(--fog); }
+  .panel.midnight { background: var(--midnight); color: var(--white); }
+  .panel.snow-panel { background: var(--snow); }
+
+  .dark { background: var(--midnight); color: var(--white); }
+  .dark .footer { border-top-color: rgba(160, 193, 203, .3); }
+  .dark .eyebrow.lime, .lime-text { color: var(--lime); }
+
+  .gradient {
+    background:
+      radial-gradient(circle at 88% 19%, #67A823 0, rgba(103, 168, 35, .55) 9%, transparent 26%),
+      radial-gradient(ellipse 34% 40% at 66% 0%, rgba(35, 107, 126, .95), transparent 100%),
+      radial-gradient(ellipse 30% 36% at 84% 58%, rgba(35, 107, 126, .9), transparent 100%),
+      var(--midnight);
+  }
+  .gradient::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 120px;
+    width: 1420px;
+    height: 860px;
+    background: var(--midnight);
+  }
+  .gradient > * { position: relative; }
+  .gradient > .footer { position: absolute; }
+
+  .hero { position: absolute; left: 120px; right: 500px; top: 330px; }
+  .hero .eyebrow { margin-bottom: 40px; }
+  .title {
+    font-weight: 300;
+    font-size: 112px;
+    line-height: 1.04;
+    letter-spacing: -.025em;
+    margin: 0 0 48px;
+  }
+  .section-title {
+    font-weight: 300;
+    font-size: 112px;
+    line-height: 1.06;
+    letter-spacing: -.025em;
+    margin: 0 0 40px;
+  }
+  .hero .sub { font-size: 40px; line-height: 1.3; font-weight: 300; max-width: 1180px; }
+  .byline {
+    position: absolute;
+    left: 120px;
+    bottom: 90px;
+    font-family: var(--mono);
+    font-size: 22px;
+    letter-spacing: .08em;
+  }
+
+  .terminal {
+    background: var(--midnight);
+    border: 0;
+    color: #E6EEF0;
+    font-size: 21px;
+    line-height: 1.62;
+    padding: 40px 48px;
+  }
+  .terminal .step { color: var(--lime); }
+  .terminal .bad { color: #FF9C94; }
+  .terminal .dim { color: var(--slate); }
+
+  .closing {
+    background:
+      radial-gradient(circle at 72% 40%, rgba(240, 240, 240, .95) 0, rgba(200, 245, 140, .7) 10%, transparent 24%),
+      linear-gradient(105deg, #4F9DF0 0%, #5BD3F8 30%, #A8FF1C 56%, #A8FF1C 80%, #6FDCD0 100%);
+  }
+  .closing .card {
+    position: absolute;
+    left: 120px;
+    top: 120px;
+    width: 1240px;
+    height: 840px;
+    background: var(--white);
+    border-radius: 16px;
+    padding: 92px 84px;
+  }
+
+  .links { font-family: var(--mono); font-size: 22px; line-height: 1.7; margin: 0; }
+  .links a { color: var(--midnight); text-decoration-color: var(--slate); text-underline-offset: 4px; }
+  .links a:hover { text-decoration-color: var(--midnight); }
+
+  svg text { font-family: var(--sans); fill: var(--midnight); }
+  svg .mono { font-family: var(--mono); }
+
+  .controls {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px;
+    background: rgba(11, 49, 57, .9);
+    border-radius: 10px;
+    color: var(--white);
+    font: 14px var(--mono);
+    opacity: 0;
+    transition: opacity .25s;
     z-index: 10;
   }
-  .progress { flex: 1; height: 4px; background: var(--line); border-radius: 2px; overflow: hidden; }
-  .progress > span { display: block; height: 100%; background: var(--accent); width: 0; transition: width .2s; }
-  .chrome button {
-    font: inherit; color: var(--ink);
-    background: var(--surface); border: 1px solid var(--line); border-radius: 8px;
-    min-width: 40px; height: 34px; padding: 0 10px; cursor: pointer;
+  .controls.visible, .controls:focus-within { opacity: 1; }
+  .controls button {
+    font: inherit;
+    color: var(--white);
+    background: transparent;
+    border: 1px solid rgba(160, 193, 203, .4);
+    border-radius: 7px;
+    width: 36px;
+    height: 32px;
+    cursor: pointer;
   }
-  .chrome button:hover { border-color: var(--accent); }
-  .chrome button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .counter { min-width: 4.5rem; text-align: center; font-variant-numeric: tabular-nums; }
-  .hint { display: none; }
-  @media (min-width: 900px) { .hint { display: inline; } }
-
-  .title-slide .inner { padding-top: clamp(0px, 8vh, 80px); }
-  .pill {
-    display: inline-block; padding: .2rem .65rem; border-radius: 999px;
-    background: var(--accent-soft); color: var(--accent);
-    font-size: .8rem; font-weight: 600; margin: 0 .35rem .35rem 0;
-  }
-  .terminal .step { color: var(--accent); font-weight: 600; }
+  .controls button:hover { border-color: var(--lime); }
+  .controls button:focus-visible { outline: 2px solid var(--lime); outline-offset: 2px; }
+  .controls .counter { min-width: 64px; text-align: center; font-variant-numeric: tabular-nums; }
+  .progress { position: fixed; left: 0; bottom: 0; height: 3px; background: var(--lime); width: 0; transition: width .2s; z-index: 10; }
 </style>
 </head>
 <body>
-<main class="deck" id="deck">
+<div class="viewport" id="viewport">
+<main class="stage" id="stage">
 
-  <section class="slide title-slide" aria-label="Title">
-    <div class="inner">
-      <p class="eyebrow">Middesk API · OAuth 2.0</p>
-      <h1>Private key JWT clients that rotate their own keys</h1>
-      <p class="lede">A Node.js client authenticates to the Middesk API with RSA keys instead of a shared secret, holds 10-minute access tokens, and swaps in a new key without anyone touching an API key.</p>
-      <p>
-        <span class="pill">client_credentials</span>
-        <span class="pill">private_key_jwt · RFC 7523</span>
-        <span class="pill">RS256</span>
-        <span class="pill">Node.js + jose</span>
-      </p>
-      <p class="muted">Use the arrow keys, space, or the buttons below to move between slides.</p>
+  <section class="slide dark gradient" aria-label="Title">
+    <div class="hero" style="top: 220px">
+      <p class="eyebrow lime">Demo · Middesk API · OAuth 2.0</p>
+      <h1 class="title">Private key JWT clients that rotate their own keys</h1>
+      <p class="sub">A Node.js client authenticates with RSA keys instead of a shared secret, holds 10-minute access tokens, and swaps in a new key without an API key.</p>
     </div>
+    <p class="byline">client_credentials · private_key_jwt (RFC 7523) · RS256 · Node.js + jose</p>
   </section>
 
   <section class="slide" aria-label="What the demo shows">
-    <div class="inner">
-      <p class="eyebrow">The goal</p>
-      <h2>What the demo shows</h2>
-      <div class="grid two">
-        <div class="card"><h3><span class="num">1</span>Asymmetric client auth</h3><p>The OAuth client proves who it is with a JWT signed by its private RSA key. Middesk stores only the public key, so there's no secret to leak from either side.</p></div>
-        <div class="card"><h3><span class="num">2</span>Short-lived tokens</h3><p>The client's <code>access_token_ttl</code> is set to 600 seconds, so every access token expires after 10 minutes instead of the default hour.</p></div>
-        <div class="card"><h3><span class="num">3</span>Self-service key rotation</h3><p>The client registers a new key and retires the old one by signing the request with a key it already holds. No API key or access token is involved.</p></div>
-        <div class="card"><h3><span class="num">4</span>Real API calls and an audit trail</h3><p>The access token creates a business, and the security event logs API shows each rotation with the key IDs before and after.</p></div>
+    <p class="eyebrow">Overview · four ideas</p>
+    <h2 class="headline">What the demo shows</h2>
+    <div class="rows">
+      <div class="row" style="grid-template-columns: 140px 780px 1fr; height: 148px">
+        <span class="idx">01</span>
+        <span style="font-weight: 300; font-size: 60px; letter-spacing: -.02em">Asymmetric client auth</span>
+        <span class="small">The client signs a JWT with its private RSA key. Middesk stores only the public key.</span>
+      </div>
+      <div class="row" style="grid-template-columns: 140px 780px 1fr; height: 148px">
+        <span class="idx">02</span>
+        <span style="font-weight: 300; font-size: 60px; letter-spacing: -.02em">Short-lived tokens</span>
+        <span class="small"><code>access_token_ttl</code> of 600 seconds, so tokens expire after 10 minutes, not an hour.</span>
+      </div>
+      <div class="row" style="grid-template-columns: 140px 780px 1fr; height: 148px">
+        <span class="idx">03</span>
+        <span style="font-weight: 300; font-size: 60px; letter-spacing: -.02em">Self-service key rotation</span>
+        <span class="small">The client adds and retires keys by signing the request with a key it already holds.</span>
+      </div>
+      <div class="row" style="grid-template-columns: 140px 780px 1fr; height: 148px">
+        <span class="idx">04</span>
+        <span style="font-weight: 300; font-size: 60px; letter-spacing: -.02em">Real calls, real audit trail</span>
+        <span class="small">The token creates a business, and the security event logs show each rotation.</span>
       </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="The pieces">
-    <div class="inner">
-      <p class="eyebrow">Architecture</p>
-      <h2>Three credentials, three jobs</h2>
-      <svg class="diagram" viewBox="0 0 1000 400" role="img" aria-labelledby="arch-title">
-        <title id="arch-title">The client uses an API key once to register, a private key to sign assertions for tokens and key rotation, and access tokens for API calls.</title>
-        <defs>
-          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrow"/></marker>
-          <marker id="arr-a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="arrow-accent"/></marker>
-        </defs>
-        <rect x="20" y="40" width="250" height="320" rx="14" class="box"/>
-        <text x="145" y="72" text-anchor="middle" class="title">Your service</text>
-        <rect x="45" y="95" width="200" height="60" rx="10" class="box-bad"/>
-        <text x="145" y="120" text-anchor="middle" class="title">API key</text>
-        <text x="145" y="140" text-anchor="middle" class="label">bootstrap only</text>
-        <rect x="45" y="175" width="200" height="60" rx="10" class="box-accent"/>
-        <text x="145" y="200" text-anchor="middle" class="title">Private RSA key</text>
-        <text x="145" y="220" text-anchor="middle" class="label">never leaves the client</text>
-        <rect x="45" y="255" width="200" height="60" rx="10" class="box-ok"/>
-        <text x="145" y="280" text-anchor="middle" class="title">Access token</text>
-        <text x="145" y="300" text-anchor="middle" class="label">expires in 10 minutes</text>
-
-        <rect x="560" y="40" width="420" height="320" rx="14" class="box"/>
-        <text x="770" y="72" text-anchor="middle" class="title">Middesk API</text>
-        <rect x="585" y="95" width="370" height="60" rx="10" class="box"/>
-        <text x="605" y="121" class="mono">POST /v1/oauth_clients</text>
-        <text x="605" y="141" class="label">register the client and its public key</text>
-        <rect x="585" y="175" width="370" height="60" rx="10" class="box"/>
-        <text x="605" y="201" class="mono">POST /oauth/token</text>
-        <text x="605" y="221" class="label">assertion in, access token out</text>
-        <rect x="585" y="255" width="370" height="40" rx="10" class="box"/>
-        <text x="605" y="280" class="mono">PUT /oauth/clients/:client_id/jwks</text>
-        <rect x="585" y="305" width="370" height="40" rx="10" class="box"/>
-        <text x="605" y="330" class="mono">/v1/businesses · /v1/security_event_logs</text>
-
-        <path d="M245,125 L583,125" class="edge" marker-end="url(#arr)"/>
-        <path d="M245,205 L583,205" class="edge-accent" marker-end="url(#arr-a)"/>
-        <path d="M245,215 C400,215 420,275 583,275" class="edge-accent" marker-end="url(#arr-a)"/>
-        <path d="M245,295 C400,295 420,325 583,325" class="edge" marker-end="url(#arr)"/>
-        <text x="410" y="115" text-anchor="middle" class="label">once</text>
-        <text x="410" y="195" text-anchor="middle" class="label">signed assertion</text>
-        <text x="330" y="247" text-anchor="middle" class="label">signed assertion</text>
-        <text x="410" y="300" text-anchor="middle" class="label">Bearer token</text>
-      </svg>
+  <section class="slide snow" aria-label="Three credentials">
+    <p class="eyebrow">Architecture</p>
+    <h2 class="headline">Three credentials, three jobs</h2>
+    <div class="rows">
+      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
+        <div><div class="card-title" style="margin: 0">API key</div><div class="small soft">Bootstrap only</div></div>
+        <div style="position: relative; margin-right: 40px">
+          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Once</div>
+          <div style="border-top: 2px dashed var(--midnight)"></div>
+        </div>
+        <div><span class="pill mono">POST /v1/oauth_clients</span><span class="pill mono">DELETE /v1/oauth_clients/:id</span></div>
+      </div>
+      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
+        <div><div class="card-title" style="margin: 0">Private RSA key</div><div class="small soft">Never leaves your service</div></div>
+        <div style="margin-right: 40px">
+          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Signed assertion</div>
+          <div style="border-top: 2px solid var(--midnight)"></div>
+        </div>
+        <div><span class="pill mono lime">POST /oauth/token</span><span class="pill mono lime">PUT /oauth/clients/:id/jwks</span></div>
+      </div>
+      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
+        <div><div class="card-title" style="margin: 0">Access token</div><div class="small soft">Expires in 10 minutes</div></div>
+        <div style="margin-right: 40px">
+          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Bearer token</div>
+          <div style="border-top: 2px solid var(--midnight)"></div>
+        </div>
+        <div><span class="pill mono">POST /v1/businesses</span><span class="pill mono">GET /v1/security_event_logs</span></div>
+      </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Step 1: bootstrap">
-    <div class="inner">
-      <p class="eyebrow">Step 1 · bootstrap</p>
-      <h2>Register the client with an API key, once</h2>
-      <div class="grid two">
-        <div>
+  <section class="slide dark gradient" aria-label="Section: set up">
+    <div class="hero">
+      <p class="eyebrow lime">01 · Set up</p>
+      <h2 class="section-title">Register once. Then authenticate with a signature.</h2>
+      <p class="sub" style="font-size: 32px">An API key creates the client. After that, the private key does the work.</p>
+    </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
+  </section>
+
+  <section class="slide" aria-label="Bootstrap">
+    <p class="eyebrow">01 · Bootstrap</p>
+    <h2 class="headline">Register the client with an API key, once</h2>
+    <div class="cols">
+      <div class="span-7">
 <pre><span class="k">const</span> k1 = <span class="k">await</span> generateSigningKey(<span class="s">'k1'</span>);
 
 <span class="k">const</span> client = <span class="k">await</span> middesk.createOAuthClient(apiKey, {
@@ -298,27 +394,29 @@
   access_token_ttl: <span class="n">600</span>,
   jwks: { keys: [k1.publicJwk] },
 });</pre>
-        </div>
-        <div>
-          <ul>
-            <li><code>generateSigningKey</code> makes a 2048-bit RSA key pair with <code>jose</code> and exports the public half as a JWK with a <code>kid</code>.</li>
-            <li><code>private_key_jwt</code> means the client can only authenticate with signed assertions. Middesk withholds its secret, so the response has <code>secret: null</code>.</li>
-            <li><code>access_token_ttl: 600</code> sets every token's lifetime to 10 minutes. The maximum is 24 hours.</li>
-            <li>This is the only call that needs the API key. The demo also uses it at the end to delete the client.</li>
-          </ul>
-        </div>
+      </div>
+      <div class="span-5">
+        <ul class="squares small">
+          <li><code>generateSigningKey</code> makes a 2048-bit RSA key pair with <code>jose</code> and exports the public half as a JWK with a <code>kid</code>.</li>
+          <li><code>private_key_jwt</code> clients can only authenticate with signed assertions, so the response has <code>secret: null</code>.</li>
+          <li><code>access_token_ttl: 600</code> gives every token a 10-minute lifetime. The maximum is 24 hours.</li>
+          <li>This is the only call that needs the API key. The demo also uses it to delete the client at the end.</li>
+        </ul>
       </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Step 2: the client assertion">
-    <div class="inner">
-      <p class="eyebrow">Step 2 · client assertion</p>
-      <h2>A short-lived JWT, signed with the private key</h2>
-      <div class="grid two">
-        <div>
+  <section class="slide" aria-label="Client assertion">
+    <p class="eyebrow">01 · Client assertion</p>
+    <h2 class="headline">A short-lived JWT, signed with the private key</h2>
+    <div class="cols">
+      <div class="span-5">
 <pre><span class="k">const</span> assertion = <span class="k">await new</span> SignJWT({})
-  .setProtectedHeader({ alg: <span class="s">'RS256'</span>, kid: key.kid })
+  .setProtectedHeader({
+    alg: <span class="s">'RS256'</span>,
+    kid: key.kid,
+  })
   .setIssuer(clientId)
   .setSubject(clientId)
   .setAudience(audience)
@@ -326,36 +424,38 @@
   .setExpirationTime(<span class="s">'2m'</span>)
   .setJti(randomUUID())
   .sign(key.privateKey);</pre>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Claim</th><th>Rule</th></tr></thead>
-            <tbody>
-              <tr><td><code>iss</code>, <code>sub</code></td><td>The <code>client_id</code></td></tr>
-              <tr><td><code>aud</code></td><td>The endpoint it's presented to, such as <code>https://api.middesk.com/oauth/token</code></td></tr>
-              <tr><td><code>jti</code></td><td>Unique. Middesk accepts each one once.</td></tr>
-              <tr><td><code>exp</code> − <code>iat</code></td><td>At most 10 minutes</td></tr>
-              <tr><td><code>kid</code> header</td><td>Picks which registered public key verifies the signature</td></tr>
-            </tbody>
-          </table>
-        </div>
+      </div>
+      <div class="span-7">
+        <table>
+          <thead><tr><th style="width: 34%">Claim</th><th>Rule</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">iss, sub</td><td>The <code>client_id</code></td></tr>
+            <tr><td class="mono">aud</td><td>The endpoint it's sent to, such as <code>https://api.middesk.com/oauth/token</code></td></tr>
+            <tr><td class="mono">jti</td><td>Unique. Middesk accepts each one once.</td></tr>
+            <tr><td class="mono">exp − iat</td><td>At most 10 minutes</td></tr>
+            <tr><td class="mono">kid header</td><td>Picks the registered public key that verifies it</td></tr>
+          </tbody>
+        </table>
       </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Step 3: get a token">
-    <div class="inner">
-      <p class="eyebrow">Step 3 · token exchange</p>
-      <h2>Trade the assertion for a 10-minute access token</h2>
-      <div class="grid two">
+  <section class="slide" aria-label="Token exchange">
+    <p class="eyebrow">01 · Token exchange</p>
+    <h2 class="headline">Trade the assertion for a 10-minute access token</h2>
+    <div class="cols">
+      <div class="span-7">
 <pre><span class="c"># request</span>
-POST /oauth/token
+<span class="k">POST</span> /oauth/token
 Content-Type: application/x-www-form-urlencoded
 
 grant_type=client_credentials
 &amp;client_assertion_type=
   urn:ietf:params:oauth:client-assertion-type:jwt-bearer
 &amp;client_assertion=eyJhbGciOiJSUzI1NiIsImtpZCI6Imsx...</pre>
+      </div>
+      <div class="span-5">
 <pre><span class="c">// response</span>
 {
   <span class="s">"access_token"</span>: <span class="s">"…"</span>,
@@ -365,15 +465,18 @@ grant_type=client_credentials
   <span class="s">"account_id"</span>: <span class="s">"…"</span>
 }</pre>
       </div>
-      <p class="muted">The token belongs to the client itself, with no user behind it. Sending the same assertion twice gets <code>invalid_client</code>, because its <code>jti</code> has already been used.</p>
     </div>
+    <div class="panel midnight" style="margin-top: 40px; padding: 34px 48px">
+      <span class="lime-text" style="font-size: 32px; font-weight: 300">The token belongs to the client, with no user behind it. Replaying an assertion gets <span style="font-family: var(--mono); font-size: 28px">invalid_client</span>.</span>
+    </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Step 4: call the API">
-    <div class="inner">
-      <p class="eyebrow">Step 4 · resource calls</p>
-      <h2>Use the token like any bearer credential</h2>
-      <div class="grid two">
+  <section class="slide" aria-label="Resource calls">
+    <p class="eyebrow">01 · Resource calls</p>
+    <h2 class="headline">Use the token like any bearer credential</h2>
+    <div class="cols">
+      <div class="span-6">
 <pre><span class="k">await</span> middesk.createBusiness(token.access_token, {
   name: <span class="s">'Middesk Inc'</span>,
   addresses: [{
@@ -385,64 +488,79 @@ grant_type=client_credentials
   }],
   orders: [{ package: <span class="s">'identity'</span> }],
 });</pre>
-<pre><span class="k">await</span> middesk.listSecurityEventLogs(token.access_token, {
-  action: <span class="s">'change_settings'</span>,
-  include_payload: <span class="s">'true'</span>,
-});
-
-<span class="c">// Authorization: Bearer &lt;access_token&gt;</span></pre>
       </div>
-      <p class="muted">Work done with the token is attributed to the client's account, the same as with an API key. API keys, user management and OAuth client management stay closed to OAuth tokens.</p>
+      <div class="span-6">
+<pre style="margin-bottom: 36px"><span class="k">await</span> middesk.listSecurityEventLogs(
+  token.access_token,
+  {
+    action: <span class="s">'change_settings'</span>,
+    include_payload: <span class="s">'true'</span>,
+  },
+);</pre>
+        <ul class="squares small">
+          <li>Work done with the token is attributed to the client's account, as with an API key.</li>
+          <li>API keys, user management and OAuth client management stay closed to OAuth tokens.</li>
+        </ul>
+      </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
+  </section>
+
+  <section class="slide dark gradient" aria-label="Section: rotate">
+    <div class="hero">
+      <p class="eyebrow lime">02 · Rotate</p>
+      <h2 class="section-title">The client signs its own key change.</h2>
+      <p class="sub" style="font-size: 32px">No API key, no access token, no shared secret.</p>
+    </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
   <section class="slide" aria-label="Rotation overview">
-    <div class="inner">
-      <p class="eyebrow">Step 5 · rotation</p>
-      <h2>Rotate with an overlap: add, switch, retire</h2>
-      <svg class="diagram" viewBox="0 0 1000 300" role="img" aria-labelledby="rot-title">
-        <title id="rot-title">Key set goes from k1, to k1 and k2 (request signed by k1), to k2 (request signed by k2).</title>
-        <defs>
-          <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" class="arrow-accent"/></marker>
-        </defs>
-        <rect x="20" y="60" width="240" height="150" rx="14" class="box"/>
-        <text x="140" y="92" text-anchor="middle" class="title">Registered keys</text>
-        <rect x="70" y="115" width="140" height="44" rx="8" class="box-accent"/>
-        <text x="140" y="143" text-anchor="middle" class="title">k1</text>
-        <text x="140" y="188" text-anchor="middle" class="label">tokens signed with k1</text>
+    <p class="eyebrow">02 · Rotation</p>
+    <h2 class="headline">Rotate with an overlap: add, switch, retire</h2>
+    <svg viewBox="0 0 1680 470" width="1680" height="470" role="img" aria-labelledby="rot-title">
+      <title id="rot-title">The key set goes from k1, to k1 and k2 with a request signed by k1, to k2 alone with a request signed by k2.</title>
+      <line x1="40" y1="90" x2="1260" y2="90" stroke="#0B3139" stroke-width="2"/>
+      <circle cx="40" cy="90" r="20" fill="#FFFFFF" stroke="#0B3139" stroke-width="2"/>
+      <circle cx="650" cy="90" r="20" fill="#FFFFFF" stroke="#0B3139" stroke-width="2"/>
+      <circle cx="1260" cy="90" r="20" fill="#A8FF1C" stroke="#0B3139" stroke-width="2"/>
 
-        <rect x="380" y="60" width="240" height="150" rx="14" class="box"/>
-        <text x="500" y="92" text-anchor="middle" class="title">Registered keys</text>
-        <rect x="400" y="115" width="95" height="44" rx="8" class="box-accent"/>
-        <text x="447" y="143" text-anchor="middle" class="title">k1</text>
-        <rect x="505" y="115" width="95" height="44" rx="8" class="box-ok"/>
-        <text x="552" y="143" text-anchor="middle" class="title">k2</text>
-        <text x="500" y="188" text-anchor="middle" class="label">either key works · switch to k2</text>
+      <text x="345" y="62" text-anchor="middle" class="mono" font-size="22">PUT jwks [k1, k2]</text>
+      <text x="345" y="134" text-anchor="middle" font-size="22" fill="#3E5C63">signed with k1</text>
+      <text x="955" y="62" text-anchor="middle" class="mono" font-size="22">PUT jwks [k2]</text>
+      <text x="955" y="134" text-anchor="middle" font-size="22" fill="#3E5C63">signed with k2</text>
 
-        <rect x="740" y="60" width="240" height="150" rx="14" class="box"/>
-        <text x="860" y="92" text-anchor="middle" class="title">Registered keys</text>
-        <rect x="790" y="115" width="140" height="44" rx="8" class="box-ok"/>
-        <text x="860" y="143" text-anchor="middle" class="title">k2</text>
-        <text x="860" y="188" text-anchor="middle" class="label">k1 rejected with invalid_client</text>
+      <text x="20" y="214" class="mono" font-size="19" letter-spacing="1.5">REGISTERED KEYS</text>
+      <rect x="20" y="240" width="140" height="64" rx="32" fill="#FFFFFF" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="90" y="282" text-anchor="middle" font-size="28">k1</text>
+      <text x="20" y="360" font-size="24">Tokens come from k1</text>
 
-        <path d="M262,135 L378,135" class="edge-accent" marker-end="url(#arr2)"/>
-        <path d="M622,135 L738,135" class="edge-accent" marker-end="url(#arr2)"/>
-        <text x="320" y="245" text-anchor="middle" class="mono">PUT jwks [k1, k2]</text>
-        <text x="320" y="266" text-anchor="middle" class="label">signed with k1</text>
-        <text x="680" y="245" text-anchor="middle" class="mono">PUT jwks [k2]</text>
-        <text x="680" y="266" text-anchor="middle" class="label">signed with k2</text>
-      </svg>
-      <p class="muted">Deploy k2 to every instance between the two calls. Tokens already issued keep working until they expire.</p>
-    </div>
+      <text x="630" y="214" class="mono" font-size="19" letter-spacing="1.5">REGISTERED KEYS</text>
+      <rect x="630" y="240" width="140" height="64" rx="32" fill="#FFFFFF" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="700" y="282" text-anchor="middle" font-size="28">k1</text>
+      <rect x="786" y="240" width="140" height="64" rx="32" fill="#A8FF1C" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="856" y="282" text-anchor="middle" font-size="28">k2</text>
+      <text x="630" y="360" font-size="24">Either key works.</text>
+      <text x="630" y="396" font-size="24">Deploy k2 everywhere.</text>
+
+      <text x="1240" y="214" class="mono" font-size="19" letter-spacing="1.5">REGISTERED KEYS</text>
+      <rect x="1240" y="240" width="140" height="64" rx="32" fill="#A8FF1C" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="1310" y="282" text-anchor="middle" font-size="28">k2</text>
+      <rect x="1240" y="330" width="420" height="64" rx="32" fill="#FCE4E4"/>
+      <text x="1450" y="371" text-anchor="middle" font-size="24" fill="#C62828">k1 refused: invalid_client</text>
+    </svg>
+    <p class="soft small" style="margin-top: 24px">Tokens issued before a rotation keep working until they expire.</p>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="The rotation request">
-    <div class="inner">
-      <p class="eyebrow">Step 5 · rotation request</p>
-      <h2>The client signs its own key change</h2>
-      <div class="grid two">
+  <section class="slide" aria-label="Rotation request">
+    <p class="eyebrow">02 · Rotation request</p>
+    <h2 class="headline">One form-encoded PUT, signed by a current key</h2>
+    <div class="cols">
+      <div class="span-5">
 <pre><span class="k">async</span> replaceJwks({ clientId, key, jwks }) {
-  <span class="k">const</span> path = <span class="s">`/oauth/clients/${clientId}/jwks`</span>;
+  <span class="k">const</span> path =
+    <span class="s">`/oauth/clients/${clientId}/jwks`</span>;
   <span class="k">const</span> assertion = <span class="k">await</span> clientAssertion({
     clientId,
     key,
@@ -454,8 +572,10 @@ grant_type=client_credentials
     ...assertion,
   }, <span class="s">'PUT'</span>);
 }</pre>
+      </div>
+      <div class="span-7">
 <pre><span class="c"># request</span>
-PUT /oauth/clients/&lt;client_id&gt;/jwks
+<span class="k">PUT</span> /oauth/clients/&lt;client_id&gt;/jwks
 Content-Type: application/x-www-form-urlencoded
 
 client_assertion_type=urn:ietf:...:jwt-bearer
@@ -466,126 +586,156 @@ client_assertion_type=urn:ietf:...:jwt-bearer
 { <span class="s">"client_id"</span>: <span class="s">"…"</span>, <span class="s">"jwks"</span>: { <span class="s">"keys"</span>: [ … ] } }</pre>
       </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Guard rails">
-    <div class="inner">
-      <p class="eyebrow">Rules the endpoint enforces</p>
-      <h2>Guard rails on key changes</h2>
-      <div class="grid three">
-        <div class="card"><h3>Its own audience</h3><p>Assertions must name <code>…/oauth/clients/&lt;id&gt;/jwks</code>. The token endpoint won't accept them, and this endpoint won't accept token assertions.</p></div>
-        <div class="card"><h3>Single use</h3><p>Every <code>jti</code> is recorded, and lifetimes over 10 minutes are refused, so a captured assertion can't be replayed.</p></div>
-        <div class="card"><h3>Keep the signing key</h3><p>The new set must still contain the key that signed the request, with the same material. A client can't upload a key set it holds no key for.</p></div>
-        <div class="card"><h3>Only <code>jwks</code></h3><p>The redirect URI, grant types, token lifetime and auth method still need the account's API key or the dashboard.</p></div>
-        <div class="card"><h3>private_key_jwt only</h3><p>Secret-based clients are refused. Keys they stored would become trusted the moment an admin switched them to private_key_jwt, outliving the secret.</p></div>
-        <div class="card"><h3>Audited</h3><p>Every change writes a <code>change_settings</code> security event with the client ID and the key IDs before and after.</p></div>
+  <section class="slide snow" aria-label="Guard rails">
+    <p class="eyebrow">02 · Guard rails</p>
+    <h2 class="headline">Rules the endpoint enforces</h2>
+    <div class="cols" style="row-gap: 52px">
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">Its own audience</div>
+        <p class="small">Assertions must name <code>…/oauth/clients/&lt;id&gt;/jwks</code>. Token assertions don't work here, and these don't work for tokens.</p>
+      </div>
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">Single use</div>
+        <p class="small">Every <code>jti</code> is recorded and lifetimes over 10 minutes are refused, so a captured assertion can't be replayed.</p>
+      </div>
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">Keep the signing key</div>
+        <p class="small">The new set must still hold the key that signed the request, with the same key material.</p>
+      </div>
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">Only the key set</div>
+        <p class="small">Redirect URI, grant types, token lifetime and auth method still need the account's API key.</p>
+      </div>
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">private_key_jwt only</div>
+        <p class="small">Secret-based clients are refused, so keys can't be planted before a switch to private_key_jwt.</p>
+      </div>
+      <div class="span-4" style="border-top: 3px solid var(--lime); padding-top: 22px">
+        <div class="card-title" style="font-size: 34px">Audited</div>
+        <p class="small">Every change writes a <code>change_settings</code> security event with the key IDs before and after.</p>
       </div>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Why not an access token">
-    <div class="inner">
-      <p class="eyebrow">Design choice</p>
-      <h2>Why rotation doesn't accept a bearer token</h2>
-      <div class="grid two">
-        <div class="card bad">
-          <h3>Rotating with an access token</h3>
-          <p>A leaked 10-minute token could add an attacker's key, turning a short-lived credential into a permanent one.</p>
-        </div>
-        <div class="card ok">
-          <h3>Rotating with a signed assertion</h3>
-          <p>Each change proves possession of a registered private key, in a single-use JWT addressed to this endpoint only.</p>
-        </div>
+  <section class="slide" aria-label="Why not a bearer token">
+    <p class="eyebrow">02 · Design choice</p>
+    <h2 class="headline">Why rotation doesn't take a bearer token</h2>
+    <div style="display: grid; grid-template-columns: 610px 1fr; height: 300px">
+      <div class="panel snow-panel" style="border-radius: 12px 0 0 12px">
+        <p class="eyebrow" style="font-size: 20px; color: var(--ink-muted)">Rejected</p>
+        <div class="card-title" style="color: var(--ink-muted)">Rotate with an access token</div>
+        <p class="small" style="color: var(--ink-muted)">A leaked 10-minute token could add an attacker's key and become a permanent credential.</p>
       </div>
-      <p>Client credentials authenticate only on the <code>/oauth</code> endpoints that manage credentials (token, revoke and jwks). Everything under <code>/v1</code> uses tokens.</p>
+      <div class="panel midnight" style="border-radius: 0 12px 12px 0">
+        <p class="eyebrow" style="font-size: 20px">Chosen</p>
+        <div class="card-title">Rotate with a signed assertion</div>
+        <p class="small">Each change proves possession of a registered private key, in a single-use JWT addressed to this endpoint alone.</p>
+      </div>
     </div>
+    <p style="margin-top: 80px"><span class="eyebrow" style="font-size: 20px; margin-right: 18px">Also note ·</span>Client credentials only authenticate on the <code>/oauth</code> endpoints: token, revoke and jwks. Everything under <code>/v1</code> takes tokens.</p>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Audit trail">
-    <div class="inner">
-      <p class="eyebrow">Step 6 · audit</p>
-      <h2>Both rotations show up in the security event logs</h2>
-<pre><span class="k">GET</span> /v1/security_event_logs?action=change_settings&amp;include_payload=true
-Authorization: Bearer &lt;token signed by k2&gt;
-
-{
-  <span class="s">"action"</span>: <span class="s">"change_settings"</span>,
-  <span class="s">"payload"</span>: {
-    <span class="s">"scope"</span>: <span class="s">"oauth_client"</span>,
-    <span class="s">"oauth_client_id"</span>: <span class="s">"…"</span>,
-    <span class="s">"old_settings"</span>: { <span class="s">"jwks_kids"</span>: [<span class="s">"k1"</span>] },
-    <span class="s">"new_settings"</span>: { <span class="s">"jwks_kids"</span>: [<span class="s">"k1"</span>, <span class="s">"k2"</span>] }
-  }
-}</pre>
-      <p class="muted">Events are written by a background job, so the demo polls for a few seconds until both appear.</p>
+  <section class="slide dark gradient" aria-label="Section: verify">
+    <div class="hero">
+      <p class="eyebrow lime">03 · Verify</p>
+      <h2 class="section-title">Every change leaves a trail.</h2>
+      <p class="sub" style="font-size: 32px">The security event logs record each rotation, and the live run shows the whole flow.</p>
     </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
+  </section>
+
+  <section class="slide snow" aria-label="Audit trail">
+    <p class="eyebrow">03 · Audit trail</p>
+    <h2 class="headline">Both rotations, read back with the k2 token</h2>
+    <div class="cols">
+      <div class="span-8">
+<pre style="margin-bottom: 36px; font-size: 19px"><span class="k">GET</span> /v1/security_event_logs?action=change_settings&amp;include_payload=true
+Authorization: Bearer &lt;token from an assertion signed by k2&gt;</pre>
+        <table>
+          <thead><tr><th>Action</th><th>Scope</th><th>Old kids</th><th>New kids</th></tr></thead>
+          <tbody>
+            <tr><td class="mono">change_settings</td><td class="mono">oauth_client</td><td>k1</td><td>k1, k2</td></tr>
+            <tr><td class="mono">change_settings</td><td class="mono">oauth_client</td><td>k1, k2</td><td>k2</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="span-4" style="padding-left: 24px">
+        <p style="font-weight: 300; font-size: 44px; line-height: 1.2; letter-spacing: -.01em">Client ID and key IDs, before and after, on every change.</p>
+        <p class="small soft">Events are written by a background job, so the demo polls for a few seconds until both appear.</p>
+      </div>
+    </div>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
   <section class="slide" aria-label="Live run">
-    <div class="inner">
-      <p class="eyebrow">Live run · api.middesk.com</p>
-      <h2>The whole flow, end to end</h2>
-<pre class="terminal"><span class="step">1. Bootstrap</span>: register a private_key_jwt client with the API key
-   token_endpoint_auth_method: private_key_jwt · access_token_ttl: 600s · secret: null
-<span class="step">2. Token</span> from an assertion signed by k1        expires_in: 600s · scope: read_write
-<span class="step">3. Business</span> created with the access token      status: open
-<span class="step">4. Rotate, part 1</span>: register k2, signed with k1   registered kids: [k1, k2]
-<span class="step">5. Token</span> from an assertion signed by k2        expires_in: 600s
-<span class="step">6. Guard rail</span>: drop the signing key            <span class="bad-text">400 invalid_client_metadata</span>
-<span class="step">7. Rotate, part 2</span>: retire k1, signed with k2     registered kids: [k2]
-<span class="step">8. Old key</span>: token request signed by k1         <span class="bad-text">401 invalid_client</span>
-<span class="step">9. Audit</span>: change_settings  k1 → k1,k2
-          change_settings  k1,k2 → k2
+    <p class="eyebrow">03 · Live run · api.middesk.com</p>
+    <h2 class="headline">The whole flow, end to end</h2>
+<pre class="terminal"><span class="step">1. Bootstrap</span>        register a private_key_jwt client with the API key
+                    <span class="dim">access_token_ttl: 600s · secret: null</span>
+<span class="step">2. Token</span>            assertion signed by k1             expires_in: 600s · scope: read_write
+<span class="step">3. Business</span>         created with the access token      status: open
+<span class="step">4. Rotate, part 1</span>   register k2, signed with k1        registered kids: [k1, k2]
+<span class="step">5. Token</span>            assertion signed by k2             expires_in: 600s
+<span class="step">6. Guard rail</span>       drop the signing key               <span class="bad">400 invalid_client_metadata</span>
+<span class="step">7. Rotate, part 2</span>   retire k1, signed with k2          registered kids: [k2]
+<span class="step">8. Old key</span>          token request signed by k1         <span class="bad">401 invalid_client</span>
+<span class="step">9. Audit</span>            change_settings  k1 → k1,k2 · k1,k2 → k2
 
-<span class="ok-text">Deleted OAuth client.</span></pre>
-    </div>
+<span class="dim">Deleted OAuth client.</span></pre>
+    <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
-  <section class="slide" aria-label="Try it">
-    <div class="inner">
+  <section class="slide closing" aria-label="Try it">
+    <div class="card">
       <p class="eyebrow">Run it yourself</p>
-      <h2>Try it</h2>
-      <div class="grid two">
-        <div>
-<pre>npm install
-cp .env.example .env
-<span class="c"># set MIDDESK_API_URL and MIDDESK_API_KEY</span>
+      <h2 class="title" style="margin-bottom: 44px">Try it</h2>
+<pre style="font-size: 22px; margin-bottom: 40px">npm install
+cp .env.example .env    <span class="c"># set MIDDESK_API_URL and MIDDESK_API_KEY</span>
 npm run demo</pre>
-          <ul>
-            <li>Node.js 20 or later. The only dependency is <code>jose</code>.</li>
-            <li>The account needs fewer than five OAuth clients, and the package in <code>MIDDESK_PACKAGE</code> enabled (<code>identity</code> by default).</li>
-            <li>In live mode, step 3 creates a real business and order on the account. The demo deletes its OAuth client when it's done.</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Files</h3>
-          <ul>
-            <li><code>src/keys.js</code>: key generation, JWK export and assertion signing</li>
-            <li><code>src/middesk.js</code>: the API client, grouped by credential</li>
-            <li><code>src/demo.js</code>: the walkthrough</li>
-          </ul>
-        </div>
-      </div>
+      <ul class="squares small" style="margin-bottom: 36px">
+        <li>Node.js 20 or later. The only dependency is <code>jose</code>.</li>
+        <li>The account needs fewer than five OAuth clients and the <code>identity</code> package enabled.</li>
+        <li>Live runs create a real business and order. The demo deletes its OAuth client at the end.</li>
+      </ul>
+      <p class="links"><a href="https://github.com/jlhawn/middesk-oauth-private-key-jwt-demo">github.com/jlhawn/middesk-oauth-private-key-jwt-demo</a><br><a href="https://docs.middesk.com/authentication/client-credentials">docs.middesk.com/authentication/client-credentials</a></p>
     </div>
   </section>
 
 </main>
+</div>
 
-<nav class="chrome" aria-label="Slide navigation">
+<div class="controls" id="controls" role="navigation" aria-label="Slide navigation">
   <button type="button" id="prev" aria-label="Previous slide">←</button>
   <span class="counter" id="counter" aria-live="polite"></span>
   <button type="button" id="next" aria-label="Next slide">→</button>
-  <div class="progress" aria-hidden="true"><span id="bar"></span></div>
-  <span class="hint">← → to navigate · T toggles theme</span>
-  <button type="button" id="theme" aria-label="Toggle light and dark theme">◐</button>
-</nav>
+</div>
+<div class="progress" id="bar" aria-hidden="true"></div>
 
 <script>
   (function () {
+    var viewport = document.getElementById('viewport');
+    var stage = document.getElementById('stage');
     var slides = Array.prototype.slice.call(document.querySelectorAll('.slide'));
     var counter = document.getElementById('counter');
     var bar = document.getElementById('bar');
+    var controls = document.getElementById('controls');
     var current = 0;
+
+    function pad(n) { return n < 10 ? '0' + n : String(n); }
+    slides.forEach(function (s, i) {
+      var p = s.querySelector('.pageno');
+      if (p) p.textContent = pad(i + 1);
+    });
+
+    function fit() {
+      var scale = Math.min(viewport.clientWidth / 1920, viewport.clientHeight / 1080);
+      stage.style.setProperty('--scale', scale);
+    }
 
     function indexFromHash() {
       var n = parseInt(location.hash.replace('#', ''), 10);
@@ -598,15 +748,22 @@ npm run demo</pre>
         var active = j === current;
         s.classList.toggle('active', active);
         s.setAttribute('aria-hidden', active ? 'false' : 'true');
-        if (active) s.scrollTop = 0;
       });
       counter.textContent = (current + 1) + ' / ' + slides.length;
       bar.style.width = ((current + 1) / slides.length * 100) + '%';
       if (updateHash) history.replaceState(null, '', '#' + (current + 1));
     }
 
+    var hideTimer = null;
+    function revealControls() {
+      controls.classList.add('visible');
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(function () { controls.classList.remove('visible'); }, 2000);
+    }
+
     document.getElementById('prev').addEventListener('click', function () { show(current - 1, true); });
     document.getElementById('next').addEventListener('click', function () { show(current + 1, true); });
+    document.addEventListener('mousemove', revealControls);
 
     document.addEventListener('keydown', function (e) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -615,34 +772,24 @@ npm run demo</pre>
       else if (k === 'ArrowLeft' || k === 'PageUp' || (k === ' ' && e.shiftKey)) { e.preventDefault(); show(current - 1, true); }
       else if (k === 'Home') { show(0, true); }
       else if (k === 'End') { show(slides.length - 1, true); }
-      else if (k === 't' || k === 'T') { toggleTheme(); }
     });
 
     var touchX = null;
-    document.addEventListener('touchstart', function (e) { touchX = e.touches[0].clientX; }, { passive: true });
+    document.addEventListener('touchstart', function (e) { touchX = e.touches[0].clientX; revealControls(); }, { passive: true });
     document.addEventListener('touchend', function (e) {
       if (touchX === null) return;
       var dx = e.changedTouches[0].clientX - touchX;
-      if (Math.abs(dx) > 60) show(current + (dx < 0 ? 1 : -1), true);
+      if (Math.abs(dx) > 50) show(current + (dx < 0 ? 1 : -1), true);
       touchX = null;
     });
 
     window.addEventListener('hashchange', function () { show(indexFromHash(), false); });
+    window.addEventListener('resize', fit);
+    if (window.ResizeObserver) new ResizeObserver(fit).observe(viewport);
 
-    var root = document.documentElement;
-    function storedTheme() { try { return localStorage.getItem('deck-theme'); } catch (e) { return null; } }
-    function saveTheme(t) { try { localStorage.setItem('deck-theme', t); } catch (e) {} }
-    function systemDark() { return window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches; }
-    function toggleTheme() {
-      var dark = root.dataset.theme ? root.dataset.theme === 'dark' : systemDark();
-      root.dataset.theme = dark ? 'light' : 'dark';
-      saveTheme(root.dataset.theme);
-    }
-    var saved = storedTheme();
-    if (saved === 'light' || saved === 'dark') root.dataset.theme = saved;
-    document.getElementById('theme').addEventListener('click', toggleTheme);
-
+    fit();
     show(indexFromHash(), false);
+    revealControls();
   })();
 </script>
 </body>
