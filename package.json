@@ -1,0 +1,16 @@
+{
+  "name": "middesk-oauth-key-rotation-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "OAuth client_credentials with private_key_jwt and self-service JWK rotation against the Middesk API",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "demo": "node --env-file-if-exists=.env src/demo.js"
+  },
+  "dependencies": {
+    "jose": "6.2.14"
+  }
+}
