@@ -11,18 +11,18 @@ A slide deck version of this walkthrough lives in [`docs/index.html`](docs/index
    `token_endpoint_auth_method: private_key_jwt`, `jwks: { keys: [k1] }`, and
    `access_token_ttl: 600`, so tokens last 10 minutes instead of the default hour. The client has
    no usable secret.
-2. **Get a token.** Sign an RFC 7523 client assertion with `k1` and exchange it at `/oauth/token`.
-   The response carries `expires_in: 600`.
+2. **Get an access token.** Sign an RFC 7523 client assertion with `k1` and exchange it at
+   `/oauth/token`. The response carries `expires_in: 600`.
 3. **Create a business** with `POST /v1/businesses`, using the access token.
 4. **Add a key.** Generate `k2` and `PUT /oauth/clients/:client_id/jwks` with `[k1, k2]`, signing
    the request with `k1`.
-5. **Use the new key.** Get a token with an assertion signed by `k2`.
+5. **Use the new key.** Get an access token with a client assertion signed by `k2`.
 6. **Guard rail.** A key set that drops the key signing the request is refused, so a client
    cannot lock itself out.
 7. **Retire the old key.** `PUT` the key set `[k2]`, signing with `k2`.
 8. **The old key is dead.** An assertion signed by `k1` is rejected with `invalid_client`.
-9. **Audit.** `GET /v1/security_event_logs` with the `k2` token shows both rotations as
-   `change_settings` events with the key IDs before and after.
+9. **Audit.** `GET /v1/security_event_logs` with the access token from step 5 shows both
+   rotations as `change_settings` events with the key IDs before and after.
 
 The demo deletes its OAuth client at the end; set `KEEP_CLIENT=1` to keep it. An account can have
 at most five OAuth clients.
@@ -57,7 +57,7 @@ client_assertion_type=urn:ietf:params:oauth:client-assertion-type:jwt-bearer
 &jwks={"keys":[{"kty":"RSA","kid":"k2","n":"...","e":"AQAB"}]}
 ```
 
-Only `jwks` can change. Changes to the redirect URI, grant types, token lifetime and
+Only `jwks` can change. Changes to the redirect URI, grant types, access token lifetime and
 authentication method still need the account's API key or the dashboard.
 
 | Status | `error` | Cause |
