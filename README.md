@@ -3,6 +3,8 @@
 A Node.js client for the Middesk API that authenticates as an OAuth `client_credentials` client
 using `private_key_jwt` with RSA keys, and rotates its own keys without an API key.
 
+A slide deck version of this walkthrough lives in [`docs/index.html`](docs/index.html).
+
 `npm run demo` walks through:
 
 1. **Bootstrap with an API key.** Generate RSA key `k1` and register a client with
