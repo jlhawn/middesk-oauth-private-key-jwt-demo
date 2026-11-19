@@ -341,32 +341,45 @@
   <section class="slide snow" aria-label="Three credentials">
     <p class="eyebrow">Architecture</p>
     <h2 class="headline">Three credentials, three jobs</h2>
-    <div class="rows">
-      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
-        <div><div class="card-title" style="margin: 0">API key</div><div class="small soft">Bootstrap only</div></div>
-        <div style="position: relative; margin-right: 40px">
-          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Once</div>
-          <div style="border-top: 2px dashed var(--midnight)"></div>
-        </div>
-        <div><span class="pill mono">POST /v1/oauth_clients</span><span class="pill mono">DELETE /v1/oauth_clients/:id</span></div>
-      </div>
-      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
-        <div><div class="card-title" style="margin: 0">Private RSA key</div><div class="small soft">Never leaves your service</div></div>
-        <div style="margin-right: 40px">
-          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Signed assertion</div>
-          <div style="border-top: 2px solid var(--midnight)"></div>
-        </div>
-        <div><span class="pill mono lime">POST /oauth/token</span><span class="pill mono lime">PUT /oauth/clients/:id/jwks</span></div>
-      </div>
-      <div class="row" style="grid-template-columns: 480px 300px 1fr; height: 190px">
-        <div><div class="card-title" style="margin: 0">Access token</div><div class="small soft">Expires in 10 minutes</div></div>
-        <div style="margin-right: 40px">
-          <div class="eyebrow" style="font-size: 18px; margin: 0 0 10px">Bearer token</div>
-          <div style="border-top: 2px solid var(--midnight)"></div>
-        </div>
-        <div><span class="pill mono">POST /v1/businesses</span><span class="pill mono">GET /v1/security_event_logs</span></div>
-      </div>
-    </div>
+    <svg viewBox="0 0 1680 620" width="1680" height="620" role="img" aria-labelledby="arch-title" style="margin-top: -16px">
+      <title id="arch-title">The client uses an API key once to register, a private key to sign assertions for tokens and key rotation, and access tokens for API calls.</title>
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#0B3139"/></marker>
+      </defs>
+
+      <rect x="0" y="8" width="520" height="604" rx="12" fill="#FFFFFF" stroke="#A0C1CB"/>
+      <text x="40" y="60" class="mono" font-size="20" letter-spacing="1.6">YOUR SERVICE</text>
+      <rect x="40" y="100" width="440" height="120" rx="12" fill="#DCE6E9"/>
+      <text x="72" y="152" font-size="36">API key</text>
+      <text x="72" y="192" font-size="22" fill="#3E5C63">Bootstrap only</text>
+      <rect x="40" y="260" width="440" height="120" rx="12" fill="#A8FF1C" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="72" y="312" font-size="36">Private RSA key</text>
+      <text x="72" y="352" font-size="22">Never leaves your service</text>
+      <rect x="40" y="420" width="440" height="120" rx="12" fill="#FFFFFF" stroke="#0B3139" stroke-width="1.5"/>
+      <text x="72" y="472" font-size="36">Access token</text>
+      <text x="72" y="512" font-size="22" fill="#3E5C63">Expires in 10 minutes</text>
+
+      <rect x="1000" y="8" width="680" height="604" rx="12" fill="#FFFFFF" stroke="#A0C1CB"/>
+      <text x="1040" y="60" class="mono" font-size="20" letter-spacing="1.6">MIDDESK API</text>
+      <rect x="1040" y="100" width="600" height="120" rx="12" fill="#F0F0F0" stroke="#A0C1CB"/>
+      <text x="1072" y="152" class="mono" font-size="24">POST /v1/oauth_clients</text>
+      <text x="1072" y="192" font-size="22" fill="#3E5C63">Register the client and its public key</text>
+      <rect x="1040" y="260" width="600" height="120" rx="12" fill="#F0F0F0" stroke="#A0C1CB"/>
+      <text x="1072" y="312" class="mono" font-size="24">POST /oauth/token</text>
+      <text x="1072" y="352" font-size="22" fill="#3E5C63">Assertion in, access token out</text>
+      <rect x="1040" y="412" width="600" height="72" rx="12" fill="#F0F0F0" stroke="#A0C1CB"/>
+      <text x="1072" y="457" class="mono" font-size="24">PUT /oauth/clients/:id/jwks</text>
+      <rect x="1040" y="504" width="600" height="72" rx="12" fill="#F0F0F0" stroke="#A0C1CB"/>
+      <text x="1072" y="549" class="mono" font-size="22">/v1/businesses · /v1/security_event_logs</text>
+
+      <path d="M480,160 L1036,160" stroke="#0B3139" stroke-width="2" stroke-dasharray="8 7" fill="none" marker-end="url(#arr)"/>
+      <path d="M480,305 L1036,305" stroke="#0B3139" stroke-width="3" fill="none" marker-end="url(#arr)"/>
+      <path d="M480,340 C720,340 800,448 1036,448" stroke="#0B3139" stroke-width="3" fill="none" marker-end="url(#arr)"/>
+      <path d="M480,495 C720,495 800,540 1036,540" stroke="#0B3139" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+      <text x="760" y="142" text-anchor="middle" class="mono" font-size="18" letter-spacing="1.4">ONCE</text>
+      <text x="760" y="287" text-anchor="middle" class="mono" font-size="18" letter-spacing="1.4">SIGNED ASSERTION</text>
+      <text x="600" y="480" text-anchor="middle" class="mono" font-size="18" letter-spacing="1.4">BEARER TOKEN</text>
+    </svg>
     <div class="footer"><span>Middesk · Private key JWT rotation</span><span class="pageno"></span></div>
   </section>
 
